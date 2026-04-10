@@ -23,7 +23,7 @@ export async function initKeys() {
 		publicKey = await importJWK(row[0].public_jwk as JWK, 'EdDSA') as CryptoKey;
 		publicJwk = row[0].public_jwk as JWK;
 	} else {
-		const pair = await generateKeyPair('EdDSA');
+		const pair = await generateKeyPair('EdDSA', { extractable: true });
 		privateKey = pair.privateKey;
 		publicKey = pair.publicKey;
 		const privJwk = await exportJWK(pair.privateKey);

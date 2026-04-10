@@ -1,7 +1,23 @@
 import postgres from 'postgres';
-import { DATABASE_URL } from '$env/static/private';
+import { env } from '$env/dynamic/private';
 
-export const sql = postgres(DATABASE_URL);
+function createConnection() {
+	const url = env.DATABASE_URL || '';
+	// Support Unix socket connections (peer auth, no password)
+	if (url.includes('host=') || url.includes('/var/run')) {
+		const params = new URLSearchParams(url.replace(/^postgres:\/\/\?/, ''));
+		return postgres({
+			host: params.get('host') || '/var/run/postgresql',
+			port: parseInt(params.get('port') || '5432'),
+			database: params.get('database') || 'noegos_auth',
+			username: params.get('user') || undefined,
+			onnotice: () => {}
+		});
+	}
+	return postgres(url);
+}
+
+export const sql = createConnection();
 
 export async function migrate() {
 	await sql`
