@@ -30,7 +30,7 @@
 						type="text"
 						id="username"
 						name="username"
-						value={form?.username ?? ''}
+						value={(form as any)?.username ?? ''}
 						autocapitalize="none"
 						class="input input-bordered w-full"
 						placeholder="paddler42"

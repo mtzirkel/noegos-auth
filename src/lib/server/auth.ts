@@ -28,7 +28,8 @@ export async function initKeys() {
 		publicKey = pair.publicKey;
 		const privJwk = await exportJWK(pair.privateKey);
 		publicJwk = await exportJWK(pair.publicKey);
-		await sql`INSERT INTO auth_keys (id, private_jwk, public_jwk) VALUES ('signing', ${sql.json(privJwk)}, ${sql.json(publicJwk)})`;
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any
+		await sql`INSERT INTO auth_keys (id, private_jwk, public_jwk) VALUES ('signing', ${sql.json(privJwk as any)}, ${sql.json(publicJwk as any)})`;
 	}
 }
 
@@ -66,7 +67,7 @@ export async function verifyToken(jwt: string) {
 		const session = await sql`SELECT id FROM sessions WHERE token_hash = ${tokenHash} AND expires_at > now()`;
 		if (session.length === 0) return null;
 
-		return payload as TokenPayload;
+		return payload as unknown as TokenPayload;
 	} catch {
 		return null;
 	}
