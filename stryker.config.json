@@ -1,0 +1,8 @@
+{
+  "$schema": "https://raw.githubusercontent.com/stryker-mutator/stryker/master/packages/core/schema/stryker-core.json",
+  "testRunner": "vitest",
+  "checkers": ["typescript"],
+  "mutate": ["src/lib/**/*.ts", "!src/lib/**/*.test.ts"],
+  "reporters": ["clear-text", "html"],
+  "htmlReporter": { "fileName": "reports/mutation/index.html" }
+}

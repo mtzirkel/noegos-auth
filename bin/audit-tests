@@ -1,0 +1,17 @@
+#!/bin/bash
+echo "=== NoEgos Auth — Test Audit ==="
+echo ""
+
+routes=$(find src/routes -name '+page.svelte' -o -name '+page.server.ts' -o -name '+server.ts' 2>/dev/null | sort)
+tests=$(find tests -name '*.test.ts' 2>/dev/null | sort)
+
+echo "Routes:"
+echo "$routes" | while read f; do [ -n "$f" ] && echo "  $f"; done
+echo ""
+echo "Test files:"
+echo "$tests" | while read f; do [ -n "$f" ] && echo "  $f"; done
+echo ""
+
+route_count=$(echo "$routes" | grep -c '.' 2>/dev/null || echo 0)
+test_count=$(echo "$tests" | grep -c '.' 2>/dev/null || echo 0)
+echo "Routes: $route_count | Test files: $test_count"
