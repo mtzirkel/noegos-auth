@@ -47,7 +47,7 @@ export async function createToken(userId: string, username: string, isAdmin: boo
 		admin: isAdmin,
 		apps: appAccess
 	})
-		.setProtectedHeader({ alg: 'EdDSA' })
+		.setProtectedHeader({ alg: 'EdDSA', kid: 'noegos-auth-signing' })
 		.setIssuedAt()
 		.setExpirationTime(expiresAt)
 		.setIssuer(AUTH_URL)
@@ -118,6 +118,60 @@ export async function getUserAppAccess(userId: string): Promise<AppAccess[]> {
 		WHERE aa.user_id = ${userId}
 	`;
 	return rows.map((r) => ({ slug: r.slug, name: r.name, role: r.role }));
+}
+
+/**
+ * Validate a return_to URL for post-login redirect.
+ *
+ * Rules:
+ * - Relative paths (starting with /) are allowed for in-app redirects
+ * - Absolute URLs must be HTTPS and their hostname must be a registered app's URL
+ *   OR a subdomain of COOKIE_DOMAIN (e.g. .noegosunderwater.com)
+ * - Anything else returns null so the caller falls back to a safe default
+ */
+export async function validateReturnTo(returnTo: string | null): Promise<string | null> {
+	if (!returnTo) return null;
+
+	// Relative path — safe, belongs to auth itself
+	if (returnTo.startsWith('/') && !returnTo.startsWith('//')) {
+		return returnTo;
+	}
+
+	let parsed: URL;
+	try {
+		parsed = new URL(returnTo);
+	} catch {
+		return null;
+	}
+
+	// Must be HTTPS in production
+	if (COOKIE_DOMAIN !== 'localhost' && parsed.protocol !== 'https:') {
+		return null;
+	}
+
+	// Allow anything under the cookie domain (e.g. .noegosunderwater.com)
+	if (COOKIE_DOMAIN && COOKIE_DOMAIN !== 'localhost') {
+		const cookieHost = COOKIE_DOMAIN.replace(/^\./, '');
+		if (parsed.hostname === cookieHost || parsed.hostname.endsWith('.' + cookieHost)) {
+			return parsed.toString();
+		}
+	}
+
+	// Allow exact matches against registered apps
+	const apps = await sql`SELECT url FROM apps WHERE url IS NOT NULL`;
+	for (const app of apps) {
+		if (!app.url) continue;
+		try {
+			const appUrl = new URL(app.url as string);
+			if (parsed.hostname === appUrl.hostname) {
+				return parsed.toString();
+			}
+		} catch {
+			// ignore invalid app URLs
+		}
+	}
+
+	return null;
 }
 
 export function cookieOptions(expiresAt: Date) {

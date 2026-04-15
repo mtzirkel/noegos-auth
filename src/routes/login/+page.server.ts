@@ -1,11 +1,18 @@
 import type { Actions, PageServerLoad } from './$types';
 import { fail, redirect } from '@sveltejs/kit';
 import { sql } from '$lib/server/db.js';
-import { verifyTotp, createToken, getUserAppAccess, cookieOptions } from '$lib/server/auth.js';
+import {
+	verifyTotp,
+	createToken,
+	getUserAppAccess,
+	cookieOptions,
+	validateReturnTo
+} from '$lib/server/auth.js';
 
 export const load: PageServerLoad = async ({ locals, url }) => {
-	if (locals.user) redirect(302, '/');
-	return { returnTo: url.searchParams.get('return') };
+	const returnTo = await validateReturnTo(url.searchParams.get('return_to'));
+	if (locals.user) redirect(302, returnTo ?? '/');
+	return { returnTo };
 };
 
 export const actions: Actions = {
@@ -35,11 +42,16 @@ export const actions: Actions = {
 		await sql`UPDATE users SET last_login = now() WHERE id = ${user.id}`;
 
 		const appAccess = await getUserAppAccess(user.id);
-		const { jwt, expiresAt } = await createToken(user.id, user.username, user.is_admin, appAccess);
+		const { jwt, expiresAt } = await createToken(
+			user.id,
+			user.username,
+			user.is_admin,
+			appAccess
+		);
 
 		cookies.set('noegos_auth', jwt, cookieOptions(expiresAt));
 
-		const returnTo = url.searchParams.get('return') || '/';
-		redirect(302, returnTo);
+		const returnTo = await validateReturnTo(url.searchParams.get('return_to'));
+		redirect(302, returnTo ?? '/');
 	}
 };

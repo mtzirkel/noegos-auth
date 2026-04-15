@@ -32,7 +32,8 @@ import {
 	initKeys,
 	createToken,
 	verifyToken,
-	getPublicJwk
+	getPublicJwk,
+	validateReturnTo
 } from '$lib/server/auth.js';
 
 // ---------------------------------------------------------------------------
@@ -228,5 +229,66 @@ describe('JWT signing and verification', () => {
 		const payload = await verifyToken(jwt);
 
 		expect(payload!.admin).toBe(true);
+	});
+});
+
+// ---------------------------------------------------------------------------
+// validateReturnTo — post-login redirect safety
+//
+// The login flow accepts ?return_to=<url> and redirects there after auth.
+// Without validation this is an open redirect vulnerability — an attacker
+// could send a link like /login?return_to=https://evil.com to steal users.
+// ---------------------------------------------------------------------------
+
+describe('validateReturnTo', () => {
+	it('returns null for null/undefined input', async () => {
+		expect(await validateReturnTo(null)).toBeNull();
+		expect(await validateReturnTo('')).toBeNull();
+	});
+
+	it('allows relative paths (in-app redirects)', async () => {
+		expect(await validateReturnTo('/admin/users')).toBe('/admin/users');
+		expect(await validateReturnTo('/')).toBe('/');
+	});
+
+	it('rejects protocol-relative URLs (// prefix)', async () => {
+		// //evil.com looks relative but resolves to a different origin —
+		// classic open redirect trick
+		expect(await validateReturnTo('//evil.com')).toBeNull();
+	});
+
+	it('rejects malformed URLs', async () => {
+		expect(await validateReturnTo('not-a-url')).toBeNull();
+		expect(await validateReturnTo('http://[invalid')).toBeNull();
+	});
+
+	it('rejects arbitrary external origins', async () => {
+		// Without COOKIE_DOMAIN set to a production value, and without the
+		// domain matching a registered app, external URLs must be rejected.
+		const { sql } = await import('$lib/server/db.js');
+		vi.mocked(sql).mockResolvedValueOnce([]);
+		expect(await validateReturnTo('https://evil.com/steal')).toBeNull();
+	});
+
+	it('allows URLs matching a registered app hostname', async () => {
+		// Requirement: a valid return_to to an app we know about is allowed
+		const { sql } = await import('$lib/server/db.js');
+		vi.mocked(sql).mockResolvedValueOnce([
+			{ url: 'https://coop.noegosunderwater.com' }
+		]);
+		const result = await validateReturnTo('https://coop.noegosunderwater.com/dashboard');
+		expect(result).toBe('https://coop.noegosunderwater.com/dashboard');
+	});
+
+	it('rejects return URLs that only partially match an app hostname', async () => {
+		// Requirement: hostname matching must be exact — evil-coop.noegosunderwater.com
+		// should not be accepted just because it contains "coop.noegosunderwater.com"
+		// as a substring. Here we register "coop.noegosunderwater.com" and try to
+		// smuggle in "evil.com" which doesn't match any app at all.
+		const { sql } = await import('$lib/server/db.js');
+		vi.mocked(sql).mockResolvedValueOnce([
+			{ url: 'https://coop.noegosunderwater.com' }
+		]);
+		expect(await validateReturnTo('https://evil.com')).toBeNull();
 	});
 });
