@@ -2,6 +2,7 @@ import type { Actions, PageServerLoad } from './$types';
 import { fail } from '@sveltejs/kit';
 import { sql } from '$lib/server/db.js';
 import { revokeAllUserSessions } from '$lib/server/auth.js';
+import { AUTH_URL } from '$env/static/private';
 
 export const load: PageServerLoad = async () => {
 	const users = await sql`
@@ -75,5 +76,25 @@ export const actions: Actions = {
 
 		await sql`DELETE FROM users WHERE id = ${userId}`;
 		return { deleted: true };
+	},
+
+	gen_setup_link: async ({ request }) => {
+		const form = await request.formData();
+		const userId = form.get('user_id')?.toString();
+		if (!userId) return fail(400, { error: 'Missing user ID' });
+
+		const users = await sql`
+			SELECT id, username, totp_verified FROM users WHERE id = ${userId}
+		`;
+		if (users.length === 0) return fail(404, { error: 'User not found' });
+
+		// Generate a fresh 7-day setup token
+		const exp = Math.floor(Date.now() / 1000) + 7 * 24 * 60 * 60;
+		const header = Buffer.from(JSON.stringify({ alg: 'none' })).toString('base64url');
+		const payload = Buffer.from(JSON.stringify({ sub: userId, purpose: 'totp-setup', exp })).toString('base64url');
+		const setupToken = `${header}.${payload}.`;
+		const setupUrl = `${AUTH_URL}/setup/${setupToken}`;
+
+		return { setupUrl, username: users[0].username, totp_verified: users[0].totp_verified };
 	}
 };

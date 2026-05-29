@@ -1,12 +1,35 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
-	let { data } = $props();
+	let { data, form } = $props();
+	// form is a union of all action return types — cast to access gen_setup_link fields
+	const setupResult = form as { setupUrl?: string; username?: string; totp_verified?: boolean } | null;
 </script>
 
 <div class="flex items-center justify-between mb-6">
 	<h1 class="text-3xl font-bold">Users</h1>
 	<a href="/admin" class="btn btn-ghost btn-sm">&larr; Back</a>
 </div>
+
+{#if setupResult?.setupUrl}
+	<div class="alert alert-info mb-6">
+		<div class="w-full">
+			<p class="font-semibold mb-1">Setup link for {setupResult.username}{setupResult.totp_verified ? ' (TOTP already active — link will let them re-scan)' : ''}:</p>
+			<div class="flex gap-2 items-center mt-1">
+				<input
+					type="text"
+					readonly
+					value={setupResult.setupUrl}
+					class="input input-bordered input-sm flex-1 font-mono text-xs"
+					onclick={(e) => (e.target as HTMLInputElement).select()}
+				/>
+				<button
+					class="btn btn-sm btn-outline"
+					onclick={() => navigator.clipboard.writeText(setupResult!.setupUrl!)}
+				>Copy</button>
+			</div>
+		</div>
+	</div>
+{/if}
 
 {#if data.users.length === 0}
 	<p class="text-center text-base-content/50 py-8">No users yet.</p>
@@ -31,7 +54,13 @@
 								{/if}
 							</p>
 						</div>
-						<div class="flex gap-1">
+						<div class="flex gap-1 flex-wrap justify-end">
+							<form method="POST" action="?/gen_setup_link" use:enhance>
+								<input type="hidden" name="user_id" value={user.id} />
+								<button class="btn btn-ghost btn-xs">
+									{user.totp_verified ? 'Reset TOTP link' : 'Get setup link'}
+								</button>
+							</form>
 							<form method="POST" action="?/toggle_admin" use:enhance>
 								<input type="hidden" name="user_id" value={user.id} />
 								<button class="btn btn-ghost btn-xs">
