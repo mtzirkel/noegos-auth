@@ -2,8 +2,6 @@ import type { Actions, PageServerLoad } from './$types';
 import { fail } from '@sveltejs/kit';
 import { sql } from '$lib/server/db.js';
 import { generateTotpSecret } from '$lib/server/auth.js';
-import { SignJWT } from 'jose';
-import crypto from 'node:crypto';
 import { AUTH_URL } from '$env/static/private';
 
 export const load: PageServerLoad = async () => {
@@ -62,10 +60,11 @@ export const actions: Actions = {
 		`;
 
 		// Generate a short-lived setup token (7 days)
-		const setupToken = await new SignJWT({ sub: userId, purpose: 'totp-setup' })
-			.setProtectedHeader({ alg: 'none' })
-			.setExpirationTime('7d')
-			.sign(crypto.createSecretKey(Buffer.alloc(0)));
+		// Simple base64url-encoded payload — verifySetupToken() decodes it manually anyway
+		const exp = Math.floor(Date.now() / 1000) + 7 * 24 * 60 * 60;
+		const header = Buffer.from(JSON.stringify({ alg: 'none' })).toString('base64url');
+		const payload = Buffer.from(JSON.stringify({ sub: userId, purpose: 'totp-setup', exp })).toString('base64url');
+		const setupToken = `${header}.${payload}.`;
 
 		const setupUrl = `${AUTH_URL}/setup/${setupToken}`;
 
