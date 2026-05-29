@@ -2,7 +2,7 @@
 	import { enhance } from '$app/forms';
 	let { data, form } = $props();
 	// form is a union of all action return types — cast to access gen_setup_link fields
-	const setupResult = form as { setupUrl?: string; username?: string; totp_verified?: boolean } | null;
+	const setupResult = $derived(form as { setupUrl?: string; username?: string; totp_verified?: boolean } | null);
 </script>
 
 <div class="flex items-center justify-between mb-6">
