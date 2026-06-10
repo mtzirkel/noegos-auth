@@ -36,7 +36,7 @@ export const actions: Actions = {
 
 		// Validate each submitted role against that app's allowed roles
 		if (appIds.length > 0) {
-			const appRows = await sql`SELECT id, roles FROM apps WHERE id = ANY(${sql.array(appIds)})`;
+			const appRows = await sql`SELECT id, roles FROM apps WHERE id = ANY(${sql.array(appIds)}::uuid[])`;
 			const appRolesMap = new Map((appRows as unknown as { id: string; roles: string[] }[]).map((a) => [a.id, a.roles]));
 			for (let i = 0; i < appIds.length; i++) {
 				const allowed = appRolesMap.get(appIds[i]) ?? ['user'];
