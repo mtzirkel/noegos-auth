@@ -4,6 +4,8 @@ import { sql } from '$lib/server/db.js';
 import { generateTotpSecret } from '$lib/server/auth.js';
 import { AUTH_URL } from '$env/static/private';
 
+const VALID_ROLES = ['user', 'admin'];
+
 export const load: PageServerLoad = async () => {
 	const requests = await sql`
 		SELECT
@@ -16,7 +18,7 @@ export const load: PageServerLoad = async () => {
 			CASE WHEN r.status = 'pending' THEN 0 ELSE 1 END,
 			r.created_at ASC
 	`;
-	const apps = await sql`SELECT id, slug, name, roles FROM apps ORDER BY name`;
+	const apps = await sql`SELECT id, slug, name FROM apps ORDER BY name`;
 	return { requests, apps };
 };
 
@@ -34,23 +36,17 @@ export const actions: Actions = {
 		`;
 		if (requests.length === 0) return fail(404, { error: 'Request not found' });
 
-		// Validate each submitted role against that app's allowed roles
-		if (appIds.length > 0) {
-			const appRows = await sql`SELECT id, roles FROM apps WHERE id = ANY(${sql.array(appIds)}::uuid[])`;
-			const appRolesMap = new Map((appRows as unknown as { id: string; roles: string[] }[]).map((a) => [a.id, a.roles]));
-			for (let i = 0; i < appIds.length; i++) {
-				const allowed = appRolesMap.get(appIds[i]) ?? ['user'];
-				const role = roles[i] || 'user';
-				if (!allowed.includes(role)) {
-					return fail(400, { error: `Invalid role "${role}" for this app. Allowed: ${allowed.join(', ')}` });
-				}
+		// Validate roles
+		for (let i = 0; i < appIds.length; i++) {
+			const role = roles[i] || 'user';
+			if (!VALID_ROLES.includes(role)) {
+				return fail(400, { error: `Invalid role "${role}". Allowed: ${VALID_ROLES.join(', ')}` });
 			}
 		}
 
 		const req = requests[0];
 		const { secret } = generateTotpSecret(req.username);
 
-		// Create user
 		const users = await sql`
 			INSERT INTO users (username, display_name, totp_secret)
 			VALUES (${req.username}, ${req.display_name}, ${secret})
@@ -58,7 +54,6 @@ export const actions: Actions = {
 		`;
 		const userId = users[0].id;
 
-		// Grant app access
 		for (let i = 0; i < appIds.length; i++) {
 			const role = roles[i] || 'user';
 			await sql`
@@ -68,19 +63,15 @@ export const actions: Actions = {
 			`;
 		}
 
-		// Mark request as approved
 		await sql`
 			UPDATE access_requests SET status = 'approved', reviewed_at = now()
 			WHERE id = ${requestId}
 		`;
 
-		// Generate a short-lived setup token (7 days)
-		// Simple base64url-encoded payload — verifySetupToken() decodes it manually anyway
 		const exp = Math.floor(Date.now() / 1000) + 7 * 24 * 60 * 60;
 		const header = Buffer.from(JSON.stringify({ alg: 'none' })).toString('base64url');
 		const payload = Buffer.from(JSON.stringify({ sub: userId, purpose: 'totp-setup', exp })).toString('base64url');
 		const setupToken = `${header}.${payload}.`;
-
 		const setupUrl = `${AUTH_URL}/setup/${setupToken}`;
 
 		return { approved: true, setupUrl, username: req.username };

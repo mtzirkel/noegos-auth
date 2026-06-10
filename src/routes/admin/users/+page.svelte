@@ -11,16 +11,6 @@
 
 	let showAddUser = $state(false);
 	let selectedAppIds = $state<string[]>([]);
-
-	// Per-user-row: tracks which app is selected in the grant_app dropdown
-	// so the role select can show that app's allowed roles.
-	// Key: user.id, Value: app.id
-	const grantAppSelection = $state<Record<string, string>>({});
-
-	function grantAppRoles(userId: string): string[] {
-		const appId = grantAppSelection[userId] ?? data.apps[0]?.id;
-		return data.apps.find((a) => a.id === appId)?.roles ?? ['user'];
-	}
 </script>
 
 <div class="flex items-center justify-between mb-6">
@@ -114,9 +104,8 @@
 									{#if checked}
 												<input type="hidden" name="app_ids" value={app.id} />
 												<select name="roles" class="select select-bordered select-xs w-28">
-													{#each app.roles as role}
-														<option value={role}>{role}</option>
-													{/each}
+													<option value="user">user</option>
+													<option value="admin">admin</option>
 												</select>
 											{/if}
 								</div>
@@ -211,16 +200,14 @@
 									<select
 										name="app_id"
 										class="select select-bordered select-xs"
-										onchange={(e) => { grantAppSelection[user.id] = (e.target as HTMLSelectElement).value; }}
 									>
 										{#each data.apps as app}
 											<option value={app.id}>{app.name}</option>
 										{/each}
 									</select>
 									<select name="role" class="select select-bordered select-xs w-28">
-										{#each grantAppRoles(user.id) as role}
-											<option value={role}>{role}</option>
-										{/each}
+										<option value="user">user</option>
+										<option value="admin">admin</option>
 									</select>
 									<button type="submit" class="btn btn-xs btn-outline">Grant</button>
 								</form>

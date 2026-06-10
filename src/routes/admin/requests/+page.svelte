@@ -84,10 +84,9 @@
 												/>
 												<span>{app.name}{app.id === req.requested_app_id ? ' (requested)' : ''}</span>
 												<select name="roles" class="select select-bordered select-xs w-28">
-													{#each app.roles as role}
-														<option value={role}>{role}</option>
-													{/each}
-												</select>
+															<option value="user">user</option>
+															<option value="admin">admin</option>
+														</select>
 											</label>
 										{/each}
 								</div>

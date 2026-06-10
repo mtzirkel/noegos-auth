@@ -4,6 +4,8 @@ import { sql } from '$lib/server/db.js';
 import { revokeAllUserSessions, generateTotpSecret } from '$lib/server/auth.js';
 import { AUTH_URL } from '$env/static/private';
 
+const VALID_ROLES = ['user', 'admin'];
+
 export const load: PageServerLoad = async ({ locals }) => {
 	const users = await sql`
 		SELECT u.*,
@@ -16,7 +18,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 		ORDER BY u.created_at DESC
 	`;
 
-	const apps = await sql`SELECT id, slug, name, roles FROM apps ORDER BY name`;
+	const apps = await sql`SELECT id, slug, name FROM apps ORDER BY name`;
 
 	return { users, apps, currentUserId: locals.user?.id ?? null };
 };
@@ -45,16 +47,10 @@ export const actions: Actions = {
 		const existing = await sql`SELECT id FROM users WHERE username = ${username}`;
 		if (existing.length > 0) return fail(400, { error: `User "${username}" already exists` });
 
-		// Validate roles against each app's allowed roles
-		if (appIds.length > 0) {
-			const appRows = await sql`SELECT id, roles FROM apps WHERE id = ANY(${sql.array(appIds)}::uuid[])`;
-			const appRolesMap = new Map((appRows as unknown as { id: string; roles: string[] }[]).map((a) => [a.id, a.roles]));
-			for (let i = 0; i < appIds.length; i++) {
-				const allowed = appRolesMap.get(appIds[i]) ?? ['user'];
-				const role = roles[i] || 'user';
-				if (!allowed.includes(role)) {
-					return fail(400, { error: `Invalid role "${role}" for this app. Allowed: ${allowed.join(', ')}` });
-				}
+		for (let i = 0; i < appIds.length; i++) {
+			const role = roles[i] || 'user';
+			if (!VALID_ROLES.includes(role)) {
+				return fail(400, { error: `Invalid role "${role}". Allowed: ${VALID_ROLES.join(', ')}` });
 			}
 		}
 
@@ -99,13 +95,8 @@ export const actions: Actions = {
 
 		if (!userId || !appId) return fail(400);
 
-		// Validate role against that app's allowed roles
-		const appRows = await sql`SELECT roles FROM apps WHERE id = ${appId}`;
-		if (appRows.length > 0) {
-			const allowed: string[] = appRows[0].roles ?? ['user'];
-			if (!allowed.includes(role)) {
-				return fail(400, { error: `Invalid role "${role}". Allowed: ${allowed.join(', ')}` });
-			}
+		if (!VALID_ROLES.includes(role)) {
+			return fail(400, { error: `Invalid role "${role}". Allowed: ${VALID_ROLES.join(', ')}` });
 		}
 
 		await sql`
@@ -114,7 +105,6 @@ export const actions: Actions = {
 			ON CONFLICT (user_id, app_id) DO UPDATE SET role = ${role}
 		`;
 
-		// Revoke sessions so user gets a fresh JWT with updated claims
 		await revokeAllUserSessions(userId);
 
 		return { updated: true };

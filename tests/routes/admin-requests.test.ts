@@ -77,7 +77,6 @@ describe('approve action', () => {
 	it('approves with app access when role is valid', async () => {
 		sqlResults = [
 			[{ id: REQUEST_ID, username: 'alice', display_name: null }], // fetch request
-			[{ id: APP_ID, roles: ['user', 'editor'] }],                  // role validation query
 			[{ id: USER_ID }],                                            // INSERT user
 			[]                                                            // INSERT app_access
 		];
@@ -87,7 +86,7 @@ describe('approve action', () => {
 			request: makeRequest({
 				request_id: REQUEST_ID,
 				app_ids: [APP_ID],
-				roles: ['editor']
+				roles: ['user']
 			})
 		} as never);
 
@@ -96,9 +95,9 @@ describe('approve action', () => {
 
 	it('rejects an invalid role for an app', async () => {
 		// Requirement: free-text role entry (e.g. "wizard") must be rejected.
+		// Validation is now in-memory against VALID_ROLES — only 1 DB query (fetch request).
 		sqlResults = [
-			[{ id: REQUEST_ID, username: 'alice', display_name: null }], // fetch request
-			[{ id: APP_ID, roles: ['user', 'editor'] }]                   // role validation query
+			[{ id: REQUEST_ID, username: 'alice', display_name: null }] // fetch request
 		];
 
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -112,14 +111,13 @@ describe('approve action', () => {
 
 		expect(result.status).toBe(400);
 		expect(result.data.error).toMatch(/wizard/);
-		// Must not have created the user
-		expect(sqlCalls.length).toBe(2);
+		// Must not have created the user — only fetch-request query ran
+		expect(sqlCalls.length).toBe(1);
 	});
 
-	it('falls back to "user" when no role submitted and validates it', async () => {
+	it('falls back to "user" when no role submitted', async () => {
 		sqlResults = [
 			[{ id: REQUEST_ID, username: 'alice', display_name: null }],
-			[{ id: APP_ID, roles: ['user'] }],
 			[{ id: USER_ID }],
 			[]
 		];

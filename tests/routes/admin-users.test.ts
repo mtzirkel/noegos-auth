@@ -89,12 +89,10 @@ describe('add_user action', () => {
 
 	it('grants app access when app_ids are provided', async () => {
 		sqlResults = [
-			[],                                                          // existence check → none
-			[{ id: 'app-1', roles: ['user'] },
-			 { id: 'app-2', roles: ['user', 'admin'] }],                 // role validation (single query for both)
-			[{ id: OTHER_ID }],                                          // INSERT user RETURNING id
-			[], // first app insert
-			[] // second app insert
+			[],              // existence check → none
+			[{ id: OTHER_ID }], // INSERT user RETURNING id
+			[],              // first app insert
+			[]               // second app insert
 		];
 
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -108,15 +106,14 @@ describe('add_user action', () => {
 		} as never);
 
 		expect(result.added).toBe(true);
-		// existence + role-validation + insert + 2 app_access inserts
-		expect(sqlCalls.length).toBe(5);
+		// existence + insert + 2 app_access inserts
+		expect(sqlCalls.length).toBe(4);
 	});
 
 	it('rejects an invalid role for an app', async () => {
 		// Requirement: submitting a made-up role like "wizard" must fail validation.
 		sqlResults = [
-			[],                                              // existence check → none
-			[{ id: 'app-1', roles: ['user', 'editor'] }]    // role validation
+			[] // existence check only — validation is in-memory now
 		];
 
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -131,8 +128,8 @@ describe('add_user action', () => {
 
 		expect(result.status).toBe(400);
 		expect(result.data.error).toMatch(/wizard/i);
-		// Must not have created the user — only existence check + role validation ran
-		expect(sqlCalls.length).toBe(2);
+		// Only existence check ran — no DB role validation query needed
+		expect(sqlCalls.length).toBe(1);
 	});
 
 	it('rejects an empty username', async () => {
