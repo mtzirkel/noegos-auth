@@ -55,6 +55,14 @@ export async function migrate() {
 		)
 	`;
 
+	// Tracks which app the requester wants access to. Nullable because legacy
+	// requests pre-date this column and the column is informational (the admin
+	// still confirms apps at approve time).
+	await sql`
+		ALTER TABLE access_requests
+		ADD COLUMN IF NOT EXISTS requested_app_id UUID REFERENCES apps(id) ON DELETE SET NULL
+	`;
+
 	await sql`
 		CREATE TABLE IF NOT EXISTS app_access (
 			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

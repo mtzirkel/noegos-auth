@@ -1,6 +1,9 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
-	let { form } = $props();
+	let { data, form } = $props();
+	const selectedAppId = $derived(
+		(form as { requestedAppId?: string } | null)?.requestedAppId || data.preselectedAppId || ''
+	);
 </script>
 
 <div class="card bg-base-100 shadow-xl">
@@ -53,6 +56,27 @@
 						class="input input-bordered w-full"
 						placeholder="Jake"
 					/>
+				</div>
+
+				<div class="form-control mb-4">
+					<label class="label" for="requested_app_id">
+						<span class="label-text">Which app do you want access to?</span>
+					</label>
+					{#if data.apps.length === 0}
+						<p class="text-sm text-warning">No apps are registered yet. Ask the admin to add one before requesting access.</p>
+					{:else}
+						<select
+							id="requested_app_id"
+							name="requested_app_id"
+							class="select select-bordered w-full"
+							required
+						>
+							<option value="" disabled selected={!selectedAppId}>Pick an app…</option>
+							{#each data.apps as app}
+								<option value={app.id} selected={app.id === selectedAppId}>{app.name}</option>
+							{/each}
+						</select>
+					{/if}
 				</div>
 
 				<div class="form-control mb-6">

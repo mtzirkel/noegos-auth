@@ -1,6 +1,14 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
-	let { form } = $props();
+	import { page } from '$app/state';
+	let { data, form } = $props();
+	const requestAccessHref = $derived(
+		data.returnTo
+			? `/request-access?return_to=${encodeURIComponent(data.returnTo)}`
+			: page.url.searchParams.get('return_to')
+				? `/request-access?return_to=${encodeURIComponent(page.url.searchParams.get('return_to')!)}`
+				: '/request-access'
+	);
 </script>
 
 <div class="card bg-base-100 shadow-xl">
@@ -53,6 +61,6 @@
 
 		<div class="divider">OR</div>
 
-		<a href="/request-access" class="btn btn-outline btn-sm w-full">Request Access</a>
+		<a href={requestAccessHref} class="btn btn-outline btn-sm w-full">Request Access</a>
 	</div>
 </div>

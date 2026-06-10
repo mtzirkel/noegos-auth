@@ -1,32 +1,118 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	let { data, form } = $props();
-	// form is a union of all action return types — cast to access gen_setup_link fields
-	const setupResult = $derived(form as { setupUrl?: string; username?: string; totp_verified?: boolean } | null);
+	// form is a union of all action return types — cast to access fields used in the UI
+	const formResult = $derived(form as {
+		setupUrl?: string;
+		username?: string;
+		totp_verified?: boolean;
+		error?: string;
+	} | null);
+
+	let showAddUser = $state(false);
+	let selectedAppIds = $state<string[]>([]);
 </script>
 
 <div class="flex items-center justify-between mb-6">
 	<h1 class="text-3xl font-bold">Users</h1>
-	<a href="/admin" class="btn btn-ghost btn-sm">&larr; Back</a>
+	<div class="flex gap-2">
+		<button class="btn btn-primary btn-sm" onclick={() => (showAddUser = !showAddUser)}>
+			{showAddUser ? 'Cancel' : '+ Add User'}
+		</button>
+		<a href="/admin" class="btn btn-ghost btn-sm">&larr; Back</a>
+	</div>
 </div>
 
-{#if setupResult?.setupUrl}
+{#if formResult?.error}
+	<div class="alert alert-error mb-6">
+		<span>{formResult.error}</span>
+	</div>
+{/if}
+
+{#if formResult?.setupUrl}
 	<div class="alert alert-info mb-6">
 		<div class="w-full">
-			<p class="font-semibold mb-1">Setup link for {setupResult.username}{setupResult.totp_verified ? ' (TOTP already active — link will let them re-scan)' : ''}:</p>
+			<p class="font-semibold mb-1">Setup link for {formResult.username}{formResult.totp_verified ? ' (TOTP already active — link will let them re-scan)' : ''}:</p>
 			<div class="flex gap-2 items-center mt-1">
 				<input
 					type="text"
 					readonly
-					value={setupResult.setupUrl}
+					value={formResult.setupUrl}
 					class="input input-bordered input-sm flex-1 font-mono text-xs"
 					onclick={(e) => (e.target as HTMLInputElement).select()}
 				/>
 				<button
 					class="btn btn-sm btn-outline"
-					onclick={() => navigator.clipboard.writeText(setupResult!.setupUrl!)}
+					onclick={() => navigator.clipboard.writeText(formResult!.setupUrl!)}
 				>Copy</button>
 			</div>
+		</div>
+	</div>
+{/if}
+
+{#if showAddUser}
+	<div class="card bg-base-100 shadow mb-6">
+		<div class="card-body">
+			<h2 class="card-title">Add User</h2>
+			<p class="text-sm text-base-content/60 mb-2">Create a user directly without requiring them to submit a request. You'll get a setup link to share.</p>
+			<form
+				method="POST"
+				action="?/add_user"
+				use:enhance={() => async ({ update }) => {
+					await update();
+					showAddUser = false;
+					selectedAppIds = [];
+				}}
+				class="space-y-3"
+			>
+				<div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+					<label class="form-control">
+						<span class="label-text">Username</span>
+						<input name="username" required class="input input-bordered" placeholder="jane" />
+					</label>
+					<label class="form-control">
+						<span class="label-text">Display name (optional)</span>
+						<input name="display_name" class="input input-bordered" placeholder="Jane Smith" />
+					</label>
+				</div>
+
+				<label class="label cursor-pointer justify-start gap-2 w-fit">
+					<input type="checkbox" name="is_admin" class="checkbox checkbox-sm" />
+					<span class="label-text">Admin</span>
+				</label>
+
+				{#if data.apps.length > 0}
+					<div>
+						<p class="font-semibold mb-1">App access</p>
+						<div class="space-y-2">
+							{#each data.apps as app}
+								{@const checked = selectedAppIds.includes(app.id)}
+								<div class="flex items-center gap-2">
+									<input
+										type="checkbox"
+										class="checkbox checkbox-sm"
+										checked={checked}
+										onchange={(e) => {
+											if ((e.target as HTMLInputElement).checked) {
+												selectedAppIds = [...selectedAppIds, app.id];
+											} else {
+												selectedAppIds = selectedAppIds.filter((id) => id !== app.id);
+											}
+										}}
+									/>
+									<span class="w-40">{app.name}</span>
+									{#if checked}
+										<input type="hidden" name="app_ids" value={app.id} />
+										<input type="text" name="roles" value="user" class="input input-bordered input-sm w-32" placeholder="role" />
+									{/if}
+								</div>
+							{/each}
+						</div>
+					</div>
+				{/if}
+
+				<button type="submit" class="btn btn-primary btn-sm">Create user</button>
+			</form>
 		</div>
 	</div>
 {/if}
@@ -36,12 +122,14 @@
 {:else}
 	<div class="space-y-4">
 		{#each data.users as user}
-			<div class="card bg-base-100 shadow">
+			{@const isSelf = user.id === data.currentUserId}
+			<div class="card bg-base-100 shadow {isSelf ? 'border border-primary/30' : ''}">
 				<div class="card-body">
 					<div class="flex items-center justify-between">
 						<div>
 							<h3 class="font-bold text-lg">
 								{user.username}
+								{#if isSelf}<span class="badge badge-secondary badge-sm ml-1">you</span>{/if}
 								{#if user.is_admin}<span class="badge badge-primary badge-sm ml-1">admin</span>{/if}
 							</h3>
 							{#if user.display_name}
@@ -61,19 +149,25 @@
 									{user.totp_verified ? 'Reset TOTP link' : 'Get setup link'}
 								</button>
 							</form>
-							<form method="POST" action="?/toggle_admin" use:enhance>
-								<input type="hidden" name="user_id" value={user.id} />
-								<button class="btn btn-ghost btn-xs">
-									{user.is_admin ? 'Remove admin' : 'Make admin'}
-								</button>
-							</form>
-							<form method="POST" action="?/delete_user" use:enhance>
-								<input type="hidden" name="user_id" value={user.id} />
-								<button class="btn btn-ghost btn-xs text-error"
-									onclick={(e) => { if (!confirm(`Delete ${user.username}?`)) e.preventDefault(); }}>
-									Delete
-								</button>
-							</form>
+							{#if isSelf}
+								<span class="btn btn-ghost btn-xs btn-disabled" title="You cannot change your own admin status or delete yourself">
+									Locked
+								</span>
+							{:else}
+								<form method="POST" action="?/toggle_admin" use:enhance>
+									<input type="hidden" name="user_id" value={user.id} />
+									<button class="btn btn-ghost btn-xs">
+										{user.is_admin ? 'Remove admin' : 'Make admin'}
+									</button>
+								</form>
+								<form method="POST" action="?/delete_user" use:enhance>
+									<input type="hidden" name="user_id" value={user.id} />
+									<button class="btn btn-ghost btn-xs text-error"
+										onclick={(e) => { if (!confirm(`Delete ${user.username}?`)) e.preventDefault(); }}>
+										Delete
+									</button>
+								</form>
+							{/if}
 						</div>
 					</div>
 

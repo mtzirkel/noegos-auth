@@ -6,11 +6,15 @@ import { AUTH_URL } from '$env/static/private';
 
 export const load: PageServerLoad = async () => {
 	const requests = await sql`
-		SELECT id, username, display_name, message, status, created_at, reviewed_at
-		FROM access_requests
+		SELECT
+			r.id, r.username, r.display_name, r.message, r.status,
+			r.created_at, r.reviewed_at, r.requested_app_id,
+			a.slug AS requested_app_slug, a.name AS requested_app_name
+		FROM access_requests r
+		LEFT JOIN apps a ON a.id = r.requested_app_id
 		ORDER BY
-			CASE WHEN status = 'pending' THEN 0 ELSE 1 END,
-			created_at ASC
+			CASE WHEN r.status = 'pending' THEN 0 ELSE 1 END,
+			r.created_at ASC
 	`;
 
 	const apps = await sql`SELECT id, slug, name FROM apps ORDER BY name`;

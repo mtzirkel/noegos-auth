@@ -47,6 +47,15 @@
 						{/if}
 					</div>
 
+					{#if req.requested_app_name}
+						<p class="text-sm mt-2">
+							<span class="text-base-content/60">Requesting access to:</span>
+							<span class="badge badge-primary badge-sm ml-1">{req.requested_app_name}</span>
+						</p>
+					{:else}
+						<p class="text-sm mt-2 text-base-content/40 italic">No specific app requested</p>
+					{/if}
+
 					{#if req.message}
 						<p class="text-sm bg-base-200 p-3 rounded-lg mt-2">"{req.message}"</p>
 					{/if}
@@ -64,10 +73,16 @@
 									<label class="label">
 										<span class="label-text font-semibold">Grant access to:</span>
 									</label>
-									{#each data.apps as app, i}
+									{#each data.apps as app}
 										<label class="label cursor-pointer justify-start gap-3">
-											<input type="checkbox" name="app_ids" value={app.id} class="checkbox checkbox-sm" />
-											<span>{app.name}</span>
+											<input
+												type="checkbox"
+												name="app_ids"
+												value={app.id}
+												class="checkbox checkbox-sm"
+												checked={app.id === req.requested_app_id}
+											/>
+											<span>{app.name}{app.id === req.requested_app_id ? ' (requested)' : ''}</span>
 											<input type="text" name="roles" value="user" class="input input-bordered input-xs w-24" placeholder="role" />
 										</label>
 									{/each}
