@@ -9,13 +9,40 @@
 			<div class="text-center">
 				<h2 class="text-2xl font-bold mb-4">Already Set Up</h2>
 				<p class="mb-4">Your account <strong>{data.username}</strong> is already configured.</p>
-				<a href="/login" class="btn btn-primary">Go to Login</a>
+				{#if data.apps && data.apps.length > 0}
+					<p class="mb-4 text-base-content/70">Head to your app:</p>
+					<div class="flex flex-col gap-2 mb-4">
+						{#each data.apps as app}
+							{#if app.url}
+								<a href={app.url} class="btn btn-primary">{app.name}</a>
+							{:else}
+								<span class="text-base-content/60">{app.name} — ask your admin for the link</span>
+							{/if}
+						{/each}
+					</div>
+				{:else}
+					<p class="mb-4 text-base-content/60">No apps assigned yet — ask your admin.</p>
+				{/if}
+				<a href="/login" class="btn btn-ghost btn-sm">Sign in to auth</a>
 			</div>
 		{:else if form?.success}
 			<div class="text-center">
-				<h2 class="text-2xl font-bold mb-4 text-success">You're All Set</h2>
-				<p class="mb-4">Your authenticator is configured. You can now sign in.</p>
-				<a href="/login" class="btn btn-primary">Sign In</a>
+				<h2 class="text-2xl font-bold mb-4 text-success">You're All Set!</h2>
+				<p class="mb-4">Your authenticator is configured. Head to your app:</p>
+				{#if form.apps && form.apps.length > 0}
+					<div class="flex flex-col gap-2 mb-4">
+						{#each form.apps as app}
+							{#if app.url}
+								<a href={app.url} class="btn btn-primary">{app.name}</a>
+							{:else}
+								<span class="text-base-content/60">{app.name} — ask your admin for the link</span>
+							{/if}
+						{/each}
+					</div>
+				{:else}
+					<p class="mb-4 text-base-content/60">No apps assigned yet — ask your admin.</p>
+				{/if}
+				<a href="/login" class="btn btn-ghost btn-sm">Sign in to auth</a>
 			</div>
 		{:else}
 			<h2 class="card-title text-2xl justify-center mb-2">Set Up Authenticator</h2>

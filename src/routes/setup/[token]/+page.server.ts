@@ -34,7 +34,15 @@ export const load: PageServerLoad = async ({ params }) => {
 	const user = users[0];
 
 	if (user.totp_verified) {
-		return { alreadySetup: true, username: user.username };
+		const rows = await sql`
+			SELECT a.name, a.url, a.slug
+			FROM app_access aa
+			JOIN apps a ON a.id = aa.app_id
+			WHERE aa.user_id = ${userId}
+			ORDER BY a.name
+		`;
+		const apps = rows.map((r) => ({ name: r.name as string, url: r.url as string | null, slug: r.slug as string }));
+		return { alreadySetup: true, username: user.username, apps };
 	}
 
 	if (!user.totp_secret) error(500, 'No TOTP secret generated');
@@ -76,6 +84,15 @@ export const actions: Actions = {
 
 		await sql`UPDATE users SET totp_verified = true WHERE id = ${userId}`;
 
-		return { success: true };
+		const rows = await sql`
+			SELECT a.name, a.url, a.slug
+			FROM app_access aa
+			JOIN apps a ON a.id = aa.app_id
+			WHERE aa.user_id = ${userId}
+			ORDER BY a.name
+		`;
+		const apps = rows.map((r) => ({ name: r.name as string, url: r.url as string | null, slug: r.slug as string }));
+
+		return { success: true, apps };
 	}
 };
