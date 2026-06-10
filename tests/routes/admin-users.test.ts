@@ -21,7 +21,10 @@ vi.mock('$lib/server/db.js', () => {
 			const next = sqlResults.shift() ?? [];
 			return Promise.resolve(next);
 		}),
-		{ json: (v: unknown) => v }
+		{
+			json: (v: unknown) => v,
+			array: (v: unknown[]) => v
+		}
 	);
 	return { sql: mockSql };
 });
@@ -86,8 +89,10 @@ describe('add_user action', () => {
 
 	it('grants app access when app_ids are provided', async () => {
 		sqlResults = [
-			[],
-			[{ id: OTHER_ID }],
+			[],                                                          // existence check → none
+			[{ id: 'app-1', roles: ['user'] },
+			 { id: 'app-2', roles: ['user', 'admin'] }],                 // role validation (single query for both)
+			[{ id: OTHER_ID }],                                          // INSERT user RETURNING id
 			[], // first app insert
 			[] // second app insert
 		];
@@ -103,8 +108,31 @@ describe('add_user action', () => {
 		} as never);
 
 		expect(result.added).toBe(true);
-		// existence + insert + 2 app_access inserts
-		expect(sqlCalls.length).toBe(4);
+		// existence + role-validation + insert + 2 app_access inserts
+		expect(sqlCalls.length).toBe(5);
+	});
+
+	it('rejects an invalid role for an app', async () => {
+		// Requirement: submitting a made-up role like "wizard" must fail validation.
+		sqlResults = [
+			[],                                              // existence check → none
+			[{ id: 'app-1', roles: ['user', 'editor'] }]    // role validation
+		];
+
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any
+		const result: any = await actions.add_user!({
+			request: makeRequest({
+				username: 'jane',
+				app_ids: ['app-1'],
+				roles: ['wizard']
+			}),
+			locals: selfLocals
+		} as never);
+
+		expect(result.status).toBe(400);
+		expect(result.data.error).toMatch(/wizard/i);
+		// Must not have created the user — only existence check + role validation ran
+		expect(sqlCalls.length).toBe(2);
 	});
 
 	it('rejects an empty username', async () => {

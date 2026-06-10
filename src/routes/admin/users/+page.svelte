@@ -11,6 +11,16 @@
 
 	let showAddUser = $state(false);
 	let selectedAppIds = $state<string[]>([]);
+
+	// Per-user-row: tracks which app is selected in the grant_app dropdown
+	// so the role select can show that app's allowed roles.
+	// Key: user.id, Value: app.id
+	const grantAppSelection = $state<Record<string, string>>({});
+
+	function grantAppRoles(userId: string): string[] {
+		const appId = grantAppSelection[userId] ?? data.apps[0]?.id;
+		return data.apps.find((a) => a.id === appId)?.roles ?? ['user'];
+	}
 </script>
 
 <div class="flex items-center justify-between mb-6">
@@ -102,9 +112,13 @@
 									/>
 									<span class="w-40">{app.name}</span>
 									{#if checked}
-										<input type="hidden" name="app_ids" value={app.id} />
-										<input type="text" name="roles" value="user" class="input input-bordered input-sm w-32" placeholder="role" />
-									{/if}
+												<input type="hidden" name="app_ids" value={app.id} />
+												<select name="roles" class="select select-bordered select-xs w-28">
+													{#each app.roles as role}
+														<option value={role}>{role}</option>
+													{/each}
+												</select>
+											{/if}
 								</div>
 							{/each}
 						</div>
@@ -191,18 +205,26 @@
 						</div>
 
 						<!-- Grant new app access -->
-						{#if data.apps.length > 0}
-							<form method="POST" action="?/grant_app" use:enhance class="flex gap-2 items-end">
-								<input type="hidden" name="user_id" value={user.id} />
-								<select name="app_id" class="select select-bordered select-xs">
-									{#each data.apps as app}
-										<option value={app.id}>{app.name}</option>
-									{/each}
-								</select>
-								<input type="text" name="role" value="user" class="input input-bordered input-xs w-20" />
-								<button type="submit" class="btn btn-xs btn-outline">Grant</button>
-							</form>
-						{/if}
+							{#if data.apps.length > 0}
+								<form method="POST" action="?/grant_app" use:enhance class="flex gap-2 items-end">
+									<input type="hidden" name="user_id" value={user.id} />
+									<select
+										name="app_id"
+										class="select select-bordered select-xs"
+										onchange={(e) => { grantAppSelection[user.id] = (e.target as HTMLSelectElement).value; }}
+									>
+										{#each data.apps as app}
+											<option value={app.id}>{app.name}</option>
+										{/each}
+									</select>
+									<select name="role" class="select select-bordered select-xs w-28">
+										{#each grantAppRoles(user.id) as role}
+											<option value={role}>{role}</option>
+										{/each}
+									</select>
+									<button type="submit" class="btn btn-xs btn-outline">Grant</button>
+								</form>
+							{/if}
 					</div>
 				</div>
 			</div>

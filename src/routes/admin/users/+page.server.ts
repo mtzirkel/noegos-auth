@@ -16,7 +16,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 		ORDER BY u.created_at DESC
 	`;
 
-	const apps = await sql`SELECT id, slug, name FROM apps ORDER BY name`;
+	const apps = await sql`SELECT id, slug, name, roles FROM apps ORDER BY name`;
 
 	return { users, apps, currentUserId: locals.user?.id ?? null };
 };
@@ -44,6 +44,19 @@ export const actions: Actions = {
 
 		const existing = await sql`SELECT id FROM users WHERE username = ${username}`;
 		if (existing.length > 0) return fail(400, { error: `User "${username}" already exists` });
+
+		// Validate roles against each app's allowed roles
+		if (appIds.length > 0) {
+			const appRows = await sql`SELECT id, roles FROM apps WHERE id = ANY(${sql.array(appIds)})`;
+			const appRolesMap = new Map((appRows as unknown as { id: string; roles: string[] }[]).map((a) => [a.id, a.roles]));
+			for (let i = 0; i < appIds.length; i++) {
+				const allowed = appRolesMap.get(appIds[i]) ?? ['user'];
+				const role = roles[i] || 'user';
+				if (!allowed.includes(role)) {
+					return fail(400, { error: `Invalid role "${role}" for this app. Allowed: ${allowed.join(', ')}` });
+				}
+			}
+		}
 
 		const { secret } = generateTotpSecret(username);
 
@@ -85,6 +98,15 @@ export const actions: Actions = {
 		const role = form.get('role')?.toString() || 'user';
 
 		if (!userId || !appId) return fail(400);
+
+		// Validate role against that app's allowed roles
+		const appRows = await sql`SELECT roles FROM apps WHERE id = ${appId}`;
+		if (appRows.length > 0) {
+			const allowed: string[] = appRows[0].roles ?? ['user'];
+			if (!allowed.includes(role)) {
+				return fail(400, { error: `Invalid role "${role}". Allowed: ${allowed.join(', ')}` });
+			}
+		}
 
 		await sql`
 			INSERT INTO app_access (user_id, app_id, role)

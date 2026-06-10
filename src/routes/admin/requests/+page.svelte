@@ -74,18 +74,22 @@
 										<span class="label-text font-semibold">Grant access to:</span>
 									</label>
 									{#each data.apps as app}
-										<label class="label cursor-pointer justify-start gap-3">
-											<input
-												type="checkbox"
-												name="app_ids"
-												value={app.id}
-												class="checkbox checkbox-sm"
-												checked={app.id === req.requested_app_id}
-											/>
-											<span>{app.name}{app.id === req.requested_app_id ? ' (requested)' : ''}</span>
-											<input type="text" name="roles" value="user" class="input input-bordered input-xs w-24" placeholder="role" />
-										</label>
-									{/each}
+											<label class="label cursor-pointer justify-start gap-3">
+												<input
+													type="checkbox"
+													name="app_ids"
+													value={app.id}
+													class="checkbox checkbox-sm"
+													checked={app.id === req.requested_app_id}
+												/>
+												<span>{app.name}{app.id === req.requested_app_id ? ' (requested)' : ''}</span>
+												<select name="roles" class="select select-bordered select-xs w-28">
+													{#each app.roles as role}
+														<option value={role}>{role}</option>
+													{/each}
+												</select>
+											</label>
+										{/each}
 								</div>
 							{:else}
 								<p class="text-sm text-warning mb-3">No apps registered yet. <a href="/admin/apps" class="link">Add one first.</a></p>

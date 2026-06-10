@@ -30,6 +30,12 @@ export async function migrate() {
 		)
 	`;
 
+	// Per-app allowed roles. Defaults to ['user'] so existing apps stay valid.
+	await sql`
+		ALTER TABLE apps
+		ADD COLUMN IF NOT EXISTS roles TEXT[] NOT NULL DEFAULT ARRAY['user']
+	`;
+
 	await sql`
 		CREATE TABLE IF NOT EXISTS users (
 			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

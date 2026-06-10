@@ -14,6 +14,9 @@
 {#if form?.created}
 	<div class="alert alert-success mb-4"><span>App created.</span></div>
 {/if}
+{#if form?.roles_updated}
+	<div class="alert alert-success mb-4"><span>Roles updated.</span></div>
+{/if}
 
 <div class="card bg-base-100 shadow mb-6">
 	<div class="card-body">
@@ -24,6 +27,12 @@
 				<input type="text" name="slug" placeholder="slug" class="input input-bordered w-32" required />
 			</div>
 			<input type="text" name="url" placeholder="https://app.noegosunderwater.com (optional)" class="input input-bordered w-full" />
+			<div class="form-control">
+				<label class="label pb-1" for="new-app-roles">
+					<span class="label-text">Roles <span class="text-base-content/50 font-normal">(comma-separated, must include "user")</span></span>
+				</label>
+				<input id="new-app-roles" type="text" name="roles" value="user" class="input input-bordered w-full" placeholder="user, admin, moderator" />
+			</div>
 			<button type="submit" class="btn btn-primary btn-sm">Add App</button>
 		</form>
 	</div>
@@ -44,6 +53,12 @@
 								{#if app.url} &middot; <a href={app.url} class="link text-xs">{app.url}</a>{/if}
 								&middot; {app.user_count} users
 							</p>
+							<div class="flex items-center gap-2 mt-2">
+								<span class="text-xs text-base-content/50">Roles:</span>
+								{#each app.roles as role}
+									<span class="badge badge-sm badge-outline">{role}</span>
+								{/each}
+							</div>
 						</div>
 						<form method="POST" action="?/delete" use:enhance>
 							<input type="hidden" name="app_id" value={app.id} />
@@ -53,6 +68,24 @@
 							</button>
 						</form>
 					</div>
+					<!-- Edit roles inline -->
+					<form method="POST" action="?/update_roles" use:enhance class="flex gap-2 items-end mt-2">
+						<input type="hidden" name="app_id" value={app.id} />
+						<div class="form-control flex-1">
+							<label class="label pb-0" for="roles-{app.id}">
+								<span class="label-text text-xs">Edit roles</span>
+							</label>
+							<input
+								id="roles-{app.id}"
+								type="text"
+								name="roles"
+								value={app.roles.join(', ')}
+								class="input input-bordered input-xs"
+								placeholder="user, admin"
+							/>
+						</div>
+						<button type="submit" class="btn btn-xs btn-outline">Save</button>
+					</form>
 				</div>
 			</div>
 		{/each}
