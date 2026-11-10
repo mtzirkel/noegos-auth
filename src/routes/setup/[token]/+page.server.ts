@@ -1,25 +1,7 @@
 import type { Actions, PageServerLoad } from './$types';
 import { fail, error } from '@sveltejs/kit';
 import { sql } from '$lib/server/db.js';
-import { verifyTotp, generateQrCode } from '$lib/server/auth.js';
-import { jwtVerify } from 'jose';
-import { importJWK } from 'jose';
-
-async function verifySetupToken(token: string) {
-	// Setup tokens are signed with a short-lived claim
-	// We store the secret in the user row when admin approves, so we just need to verify
-	// the token points to a valid user who hasn't set up TOTP yet
-	try {
-		// Decode without verification first to get the user ID
-		const parts = token.split('.');
-		const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString());
-		if (payload.purpose !== 'totp-setup') return null;
-		if (payload.exp && payload.exp < Date.now() / 1000) return null;
-		return payload.sub as string;
-	} catch {
-		return null;
-	}
-}
+import { verifyTotp, generateQrCode, verifySetupToken } from '$lib/server/auth.js';
 
 export const load: PageServerLoad = async ({ params }) => {
 	const userId = await verifySetupToken(params.token);

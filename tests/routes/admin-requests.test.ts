@@ -28,7 +28,8 @@ vi.mock('$lib/server/auth.js', async () => {
 	const actual = await vi.importActual<typeof import('$lib/server/auth.js')>('$lib/server/auth.js');
 	return {
 		...actual,
-		generateTotpSecret: () => ({ secret: 'TESTSECRET', uri: 'otpauth://test' })
+		generateTotpSecret: () => ({ secret: 'TESTSECRET', uri: 'otpauth://test' }),
+		createSetupToken: vi.fn().mockResolvedValue('signed.setup.token')
 	};
 });
 

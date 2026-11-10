@@ -1,7 +1,7 @@
 import type { Actions, PageServerLoad } from './$types';
 import { fail } from '@sveltejs/kit';
 import { sql } from '$lib/server/db.js';
-import { generateTotpSecret } from '$lib/server/auth.js';
+import { generateTotpSecret, createSetupToken } from '$lib/server/auth.js';
 import { AUTH_URL } from '$env/static/private';
 
 const VALID_ROLES = ['user', 'admin'];
@@ -68,10 +68,7 @@ export const actions: Actions = {
 			WHERE id = ${requestId}
 		`;
 
-		const exp = Math.floor(Date.now() / 1000) + 7 * 24 * 60 * 60;
-		const header = Buffer.from(JSON.stringify({ alg: 'none' })).toString('base64url');
-		const payload = Buffer.from(JSON.stringify({ sub: userId, purpose: 'totp-setup', exp })).toString('base64url');
-		const setupToken = `${header}.${payload}.`;
+		const setupToken = await createSetupToken(userId);
 		const setupUrl = `${AUTH_URL}/setup/${setupToken}`;
 
 		return { approved: true, setupUrl, username: req.username };

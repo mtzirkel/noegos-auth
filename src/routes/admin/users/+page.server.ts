@@ -1,7 +1,7 @@
 import type { Actions, PageServerLoad } from './$types';
 import { fail } from '@sveltejs/kit';
 import { sql } from '$lib/server/db.js';
-import { revokeAllUserSessions, generateTotpSecret } from '$lib/server/auth.js';
+import { revokeAllUserSessions, generateTotpSecret, createSetupToken } from '$lib/server/auth.js';
 import { AUTH_URL } from '$env/static/private';
 
 const VALID_ROLES = ['user', 'admin'];
@@ -23,11 +23,8 @@ export const load: PageServerLoad = async ({ locals }) => {
 	return { users, apps, currentUserId: locals.user?.id ?? null };
 };
 
-function buildSetupUrl(userId: string): string {
-	const exp = Math.floor(Date.now() / 1000) + 7 * 24 * 60 * 60;
-	const header = Buffer.from(JSON.stringify({ alg: 'none' })).toString('base64url');
-	const payload = Buffer.from(JSON.stringify({ sub: userId, purpose: 'totp-setup', exp })).toString('base64url');
-	return `${AUTH_URL}/setup/${header}.${payload}.`;
+async function buildSetupUrl(userId: string): Promise<string> {
+	return `${AUTH_URL}/setup/${await createSetupToken(userId)}`;
 }
 
 export const actions: Actions = {
@@ -72,7 +69,7 @@ export const actions: Actions = {
 			`;
 		}
 
-		return { added: true, setupUrl: buildSetupUrl(userId), username, totp_verified: false };
+		return { added: true, setupUrl: await buildSetupUrl(userId), username, totp_verified: false };
 	},
 
 	toggle_admin: async ({ request, locals }) => {
@@ -151,7 +148,7 @@ export const actions: Actions = {
 		if (users.length === 0) return fail(404, { error: 'User not found' });
 
 		return {
-			setupUrl: buildSetupUrl(userId),
+			setupUrl: await buildSetupUrl(userId),
 			username: users[0].username,
 			totp_verified: users[0].totp_verified
 		};

@@ -36,6 +36,7 @@ vi.mock('$lib/server/auth.js', async () => {
 	return {
 		...actual,
 		generateTotpSecret: () => ({ secret: 'TESTSECRET', uri: 'otpauth://test' }),
+		createSetupToken: vi.fn().mockResolvedValue('signed.setup.token'),
 		revokeAllUserSessions: vi.fn().mockResolvedValue(undefined)
 	};
 });

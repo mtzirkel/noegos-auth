@@ -73,6 +73,36 @@ export async function verifyToken(jwt: string) {
 	}
 }
 
+const SETUP_TOKEN_DAYS = 7;
+const SETUP_AUDIENCE = 'noegos-auth:totp-setup';
+
+/** Signed, short-lived token embedded in TOTP setup links. */
+export async function createSetupToken(userId: string): Promise<string> {
+	return new SignJWT({ purpose: 'totp-setup' })
+		.setProtectedHeader({ alg: 'EdDSA', kid: 'noegos-auth-signing' })
+		.setSubject(userId)
+		.setIssuedAt()
+		.setExpirationTime(`${SETUP_TOKEN_DAYS}d`)
+		.setIssuer(AUTH_URL)
+		.setAudience(SETUP_AUDIENCE)
+		.sign(privateKey);
+}
+
+/** Returns the user id for a valid setup token, or null. Rejects unsigned/forged tokens. */
+export async function verifySetupToken(token: string): Promise<string | null> {
+	try {
+		const { payload } = await jwtVerify(token, publicKey, {
+			issuer: AUTH_URL,
+			audience: SETUP_AUDIENCE,
+			algorithms: ['EdDSA']
+		});
+		if (payload.purpose !== 'totp-setup' || typeof payload.sub !== 'string') return null;
+		return payload.sub;
+	} catch {
+		return null;
+	}
+}
+
 export async function revokeSession(jwt: string) {
 	const tokenHash = crypto.createHash('sha256').update(jwt).digest('hex');
 	await sql`DELETE FROM sessions WHERE token_hash = ${tokenHash}`;

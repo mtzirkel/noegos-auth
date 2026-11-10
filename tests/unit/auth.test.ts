@@ -33,7 +33,9 @@ import {
 	createToken,
 	verifyToken,
 	getPublicJwk,
-	validateReturnTo
+	validateReturnTo,
+	createSetupToken,
+	verifySetupToken
 } from '$lib/server/auth.js';
 
 // ---------------------------------------------------------------------------
@@ -290,5 +292,43 @@ describe('validateReturnTo', () => {
 			{ url: 'https://coop.noegosunderwater.com' }
 		]);
 		expect(await validateReturnTo('https://evil.com')).toBeNull();
+	});
+});
+
+// ---------------------------------------------------------------------------
+// Setup tokens — must be signed; unsigned or forged tokens are rejected
+// ---------------------------------------------------------------------------
+
+describe('setup tokens', () => {
+	beforeAll(async () => {
+		await initKeys();
+	});
+
+	const b64 = (o: unknown) => Buffer.from(JSON.stringify(o)).toString('base64url');
+	const future = () => Math.floor(Date.now() / 1000) + 3600;
+
+	it('round-trips a signed setup token to the user id', async () => {
+		const token = await createSetupToken('user-123');
+		expect(await verifySetupToken(token)).toBe('user-123');
+	});
+
+	it('rejects an unsigned alg:none token (the old format)', async () => {
+		const forged = `${b64({ alg: 'none' })}.${b64({ sub: 'victim', purpose: 'totp-setup', exp: future() })}.`;
+		expect(await verifySetupToken(forged)).toBeNull();
+	});
+
+	it('rejects a token whose payload was tampered with', async () => {
+		const [h, , sig] = (await createSetupToken('user-123')).split('.');
+		const tampered = `${h}.${b64({ sub: 'victim', purpose: 'totp-setup', exp: future() })}.${sig}`;
+		expect(await verifySetupToken(tampered)).toBeNull();
+	});
+
+	it('rejects a session JWT used as a setup token', async () => {
+		const { jwt } = await createToken('user-123', 'alice', false, []);
+		expect(await verifySetupToken(jwt)).toBeNull();
+	});
+
+	it('rejects garbage', async () => {
+		expect(await verifySetupToken('not-a-token')).toBeNull();
 	});
 });
