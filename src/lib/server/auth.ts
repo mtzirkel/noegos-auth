@@ -73,6 +73,37 @@ export async function verifyToken(jwt: string) {
 	}
 }
 
+/**
+ * Sign an OAuth access token (RFC 9068 shape) with the shared EdDSA key.
+ * Resource servers verify it locally via /api/jwks — no session row is kept,
+ * so lifetime should stay short.
+ */
+export async function signAccessToken(
+	claims: Record<string, unknown> & { sub: string; aud: string },
+	ttlSeconds: number
+): Promise<string> {
+	const { sub, aud, ...rest } = claims;
+	return new SignJWT(rest)
+		.setProtectedHeader({ alg: 'EdDSA', kid: 'noegos-auth-signing', typ: 'at+jwt' })
+		.setSubject(sub)
+		.setAudience(aud)
+		.setIssuer(AUTH_URL)
+		.setIssuedAt()
+		.setJti(crypto.randomUUID())
+		.setExpirationTime(Math.floor(Date.now() / 1000) + ttlSeconds)
+		.sign(privateKey);
+}
+
+/** Verify a token this server issued (any typ). Used by tests and /oauth/introspection-style checks. */
+export async function verifyIssuedJwt(jwt: string, audience?: string) {
+	const { payload, protectedHeader } = await jwtVerify(jwt, publicKey, {
+		issuer: AUTH_URL,
+		audience,
+		algorithms: ['EdDSA']
+	});
+	return { payload, protectedHeader };
+}
+
 const SETUP_TOKEN_DAYS = 7;
 const SETUP_AUDIENCE = 'noegos-auth:totp-setup';
 

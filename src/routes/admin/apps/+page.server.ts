@@ -30,6 +30,26 @@ export const actions: Actions = {
 		return { created: true };
 	},
 
+	update: async ({ request }) => {
+		const form = await request.formData();
+		const appId = form.get('app_id')?.toString();
+		const name = form.get('name')?.toString()?.trim();
+		const url = form.get('url')?.toString()?.trim() || null;
+		if (!appId || !name) return fail(400, { error: 'Name is required' });
+		if (url) {
+			try {
+				const u = new URL(url);
+				if (u.protocol !== 'https:' && u.hostname !== 'localhost') {
+					return fail(400, { error: 'App URL must be https' });
+				}
+			} catch {
+				return fail(400, { error: 'App URL is not a valid URL' });
+			}
+		}
+		await sql`UPDATE apps SET name = ${name}, url = ${url} WHERE id = ${appId}`;
+		return { updated: true };
+	},
+
 	delete: async ({ request }) => {
 		const form = await request.formData();
 		const appId = form.get('app_id')?.toString();

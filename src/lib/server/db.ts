@@ -83,4 +83,48 @@ export async function migrate() {
 			created_at TIMESTAMPTZ DEFAULT now()
 		)
 	`;
+
+	// --- OAuth 2.1 authorization server (MCP / agent clients) ---
+	await sql`
+		CREATE TABLE IF NOT EXISTS oauth_clients (
+			client_id TEXT PRIMARY KEY,
+			client_name TEXT NOT NULL,
+			redirect_uris TEXT[] NOT NULL,
+			created_at TIMESTAMPTZ DEFAULT now(),
+			last_used_at TIMESTAMPTZ
+		)
+	`;
+
+	await sql`
+		CREATE TABLE IF NOT EXISTS oauth_codes (
+			code_hash TEXT PRIMARY KEY,
+			client_id TEXT NOT NULL REFERENCES oauth_clients(client_id) ON DELETE CASCADE,
+			user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			app_id UUID NOT NULL REFERENCES apps(id) ON DELETE CASCADE,
+			redirect_uri TEXT NOT NULL,
+			code_challenge TEXT NOT NULL,
+			resource TEXT NOT NULL,
+			scope TEXT NOT NULL,
+			expires_at TIMESTAMPTZ NOT NULL,
+			used_at TIMESTAMPTZ
+		)
+	`;
+
+	await sql`
+		CREATE TABLE IF NOT EXISTS oauth_refresh_tokens (
+			token_hash TEXT PRIMARY KEY,
+			family_id UUID NOT NULL,
+			client_id TEXT NOT NULL REFERENCES oauth_clients(client_id) ON DELETE CASCADE,
+			user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			app_id UUID NOT NULL REFERENCES apps(id) ON DELETE CASCADE,
+			resource TEXT NOT NULL,
+			scope TEXT NOT NULL,
+			created_at TIMESTAMPTZ DEFAULT now(),
+			expires_at TIMESTAMPTZ NOT NULL,
+			used_at TIMESTAMPTZ,
+			revoked_at TIMESTAMPTZ
+		)
+	`;
+	await sql`CREATE INDEX IF NOT EXISTS oauth_refresh_family_idx ON oauth_refresh_tokens(family_id)`;
+	await sql`CREATE INDEX IF NOT EXISTS oauth_refresh_user_idx ON oauth_refresh_tokens(user_id)`;
 }

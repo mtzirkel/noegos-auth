@@ -13,6 +13,7 @@
 				{#if data.user.isAdmin}
 					<a href="/admin" class="btn btn-sm btn-ghost">Admin</a>
 				{/if}
+				<a href="/connections" class="btn btn-sm btn-ghost">Connected apps</a>
 				<span class="text-sm opacity-70">{data.user.username}</span>
 				<form method="POST" action="/logout">
 					<button class="btn btn-sm btn-ghost">Logout</button>

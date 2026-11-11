@@ -70,3 +70,35 @@ Read the `noegos_auth` cookie in your app's middleware/hooks, verify the JWT usi
 - **access_requests** -- pending/approved/denied requests
 - **app_access** -- user-to-app access with per-app roles
 - **sessions** -- active JWT sessions (for revocation)
+
+## OAuth 2.1 for agents (MCP)
+
+noegos-auth is also an OAuth 2.1 authorization server, so AI agents (Claude.ai /
+Claude Desktop custom connectors, ChatGPT, Hermes/Flow, Claude Code) can act on a
+user's behalf in ONE app without cookies.
+
+- Metadata: `GET /.well-known/oauth-authorization-server`
+- Dynamic client registration (public clients only): `POST /oauth/register`
+- Authorize (TOTP login + consent): `GET /oauth/authorize` — PKCE S256 and `resource` are required
+- Token (authorization_code, refresh_token): `POST /oauth/token`
+- Revoke: `POST /oauth/revoke`
+- Users manage connected agents at `/connections`; admins cut access via `/admin/users`.
+
+**Tokens.** Access tokens are EdDSA JWTs (`typ: at+jwt`, 1h) signed with the same key as
+session cookies:
+`{ iss, sub, aud: <resource>, username, client_id, scope: "read write", apps: [{slug, name, role}] }`.
+Refresh tokens are opaque, rotate on every use, and replaying an old one revokes the chain.
+
+### Making your app an OAuth resource server (e.g. an MCP endpoint)
+
+1. In `/admin/apps`, set the app's **URL** (e.g. `https://ww-journal.noegosunderwater.com`).
+   Any `resource` under that URL (like `/mcp`) maps to the app.
+2. Serve `GET /.well-known/oauth-protected-resource` (RFC 9728) from the app:
+   `{ "resource": "<origin>/mcp", "authorization_servers": ["https://auth.noegosunderwater.com"], "scopes_supported": ["read","write"] }`
+3. On the protected endpoint, require `Authorization: Bearer <jwt>` and verify with the JWKS:
+   `issuer = AUTH_URL`, `audience = <origin>/mcp`, header `typ = at+jwt`, then check
+   `apps[].slug` and `scope`. On failure return `401` with
+   `WWW-Authenticate: Bearer resource_metadata="<origin>/.well-known/oauth-protected-resource"`.
+4. Don't let your cookie middleware redirect those paths to `/login`.
+
+`read` / `write` are the only scopes; because tokens are audience-bound they mean "read/write in this app".

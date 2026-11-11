@@ -1,6 +1,8 @@
 import type { Handle } from '@sveltejs/kit';
 import { migrate } from '$lib/server/db.js';
 import { initKeys, verifyToken } from '$lib/server/auth.js';
+import { isCsrfViolation } from '$lib/server/csrf.js';
+import { dev } from '$app/environment';
 
 let initialized = false;
 
@@ -12,6 +14,10 @@ async function init() {
 }
 
 export const handle: Handle = async ({ event, resolve }) => {
+	if (!dev && isCsrfViolation(event.request, event.url)) {
+		return new Response(`Cross-site ${event.request.method} form submissions are forbidden`, { status: 403 });
+	}
+
 	await init();
 
 	const token = event.cookies.get('noegos_auth');

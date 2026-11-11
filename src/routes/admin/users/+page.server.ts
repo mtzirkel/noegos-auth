@@ -121,6 +121,13 @@ export const actions: Actions = {
 		`;
 
 		await revokeAllUserSessions(userId);
+		// Also cut off OAuth clients (agents) for that app. Outstanding access
+		// tokens expire within the hour; refresh is refused from now on.
+		await sql`
+			UPDATE oauth_refresh_tokens SET revoked_at = now()
+			WHERE user_id = ${userId} AND revoked_at IS NULL
+			AND app_id = (SELECT id FROM apps WHERE slug = ${appSlug})
+		`;
 
 		return { updated: true };
 	},

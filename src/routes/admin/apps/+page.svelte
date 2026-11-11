@@ -11,6 +11,9 @@
 {#if form?.error}
 	<div class="alert alert-error mb-4"><span>{form.error}</span></div>
 {/if}
+{#if form?.updated}
+	<div class="alert alert-success mb-4"><span>App updated.</span></div>
+{/if}
 {#if form?.created}
 	<div class="alert alert-success mb-4"><span>App created.</span></div>
 {/if}
@@ -44,6 +47,18 @@
 							&middot; {app.user_count} users
 						</p>
 					</div>
+					<details class="dropdown dropdown-end">
+						<summary class="btn btn-ghost btn-xs">Edit</summary>
+						<form method="POST" action="?/update" use:enhance
+							class="dropdown-content z-10 card bg-base-100 shadow p-3 w-80 space-y-2">
+							<input type="hidden" name="app_id" value={app.id} />
+							<input type="text" name="name" value={app.name} class="input input-bordered input-sm w-full" required />
+							<input type="text" name="url" value={app.url ?? ''} placeholder="https://app.noegosunderwater.com"
+								class="input input-bordered input-sm w-full" />
+							<p class="text-xs opacity-60">The URL is also the OAuth resource: agents can request tokens for anything under it (e.g. /mcp).</p>
+							<button type="submit" class="btn btn-primary btn-xs">Save</button>
+						</form>
+					</details>
 					<form method="POST" action="?/delete" use:enhance>
 						<input type="hidden" name="app_id" value={app.id} />
 						<button type="submit" class="btn btn-ghost btn-xs text-error"
